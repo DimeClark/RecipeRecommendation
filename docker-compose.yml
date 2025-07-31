@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: recipe-postgres
+    environment:
+      POSTGRES_DB: recipe_db
+      POSTGRES_USER: recipe_user
+      POSTGRES_PASSWORD: recipe_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - recipe-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recipe_user -d recipe_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: recipe-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - recipe-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: recipe-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://recipe_user:recipe_password@postgres:5432/recipe_db
+      REDIS_URL: redis://redis:6379
+      ML_SERVICE_URL: http://ml-service:8000
+      JWT_SECRET: your-super-secret-jwt-key
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  # ML Service
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: recipe-ml-service
+    environment:
+      MODEL_PATH: /app/models
+      UPLOAD_FOLDER: /app/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml-service:/app
+      - ml_models:/app/models
+      - ml_uploads:/app/uploads
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  # Frontend (for production)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: recipe-frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:3001/api
+      VITE_ML_SERVICE_URL: http://localhost:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - ml-service
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  # Nginx (Load Balancer & Reverse Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: recipe-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - uploads:/var/www/uploads
+    depends_on:
+      - frontend
+      - backend
+      - ml-service
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+  ml_models:
+  ml_uploads:
+
+networks:
+  recipe-network:
+    driver: bridge
