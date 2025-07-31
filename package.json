@@ -1,0 +1,36 @@
+{
+  "name": "recipe-recommendation-platform",
+  "version": "1.0.0",
+  "description": "🍽️ Full-stack recipe recommendation platform with AI ingredient detection, personalized suggestions, dietary filtering, and smart shopping lists",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:ml\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:ml": "cd ml-service && python app.py",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../ml-service && pip install -r requirements.txt",
+    "build": "cd frontend && npm run build",
+    "test": "cd backend && npm test && cd ../frontend && npm test",
+    "lint": "cd frontend && npm run lint && cd ../backend && npm run lint"
+  },
+  "keywords": [
+    "recipe",
+    "recommendation",
+    "ai",
+    "ml",
+    "react",
+    "nodejs",
+    "typescript",
+    "food",
+    "cooking"
+  ],
+  "author": "DimeClark",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
